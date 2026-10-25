@@ -1,0 +1,29 @@
+services:
+  coordinator:
+    build: .
+    image: optikeep:development
+    ports: ["127.0.0.1:18766:18766"]
+    environment:
+      OPTIKEEP_API_TOKEN: ${OPTIKEEP_API_TOKEN:?Set a token of at least 24 characters}
+      OPTIKEEP_DAEMON_TOKEN: ${OPTIKEEP_DAEMON_TOKEN:?Set a separate daemon token}
+      OPTIKEEP_DATABASE_URL: ${OPTIKEEP_DATABASE_URL:-sqlite:////config/optikeep.sqlite3}
+    volumes:
+      - optikeep_config:/config
+      - ${OPTIKEEP_MEDIA_ROOT:?Set a disposable preview media directory}:/media:ro
+    read_only: true
+    tmpfs: ["/tmp:size=128m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+  daemon:
+    image: optikeep:development
+    command: ["daemon", "--url", "http://coordinator:18766"]
+    environment:
+      OPTIKEEP_DAEMON_TOKEN: ${OPTIKEEP_DAEMON_TOKEN:?Set a separate daemon token}
+    volumes:
+      - ${OPTIKEEP_MEDIA_ROOT:?Set a disposable preview media directory}:/media:ro
+    read_only: true
+    tmpfs: ["/tmp:size=128m"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+volumes:
+  optikeep_config:

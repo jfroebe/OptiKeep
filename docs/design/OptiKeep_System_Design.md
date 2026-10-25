@@ -1,7 +1,7 @@
 # Purpose and document control
 
 OptiKeep system design and requirements specification
-Version 1.0 | 25 October 2026 | Prepared for Jason Froebe
+Version 1.1 | 25 October 2026 | Prepared for Jason Froebe
 Status: implementation baseline proposal. This document defines intended behavior, not a claim of implemented or tested functionality. PostgreSQL and SQLite3 are mandatory supported alternatives. Both provide identical evidence, safety and recovery semantics; backend selection changes database operations and capacity, not detector coverage.
 OptiKeep is a Linux and Unraid appliance for distributed photo and video duplicate analysis, quality ranking, explainable keeper selection and reversible quarantine. A single authoritative coordinator owns discovery, persistence, scheduling and all source modifications. Analysis daemons have read-only source mounts and no database credentials.
 Scope includes mandatory Czkawka alongside internal detection, FFmpeg and FFprobe, persistent caches, multiple daemons, a web interface, REST API, metrics, Docker packaging and an Unraid template. Windows and macOS qualification are excluded. Testing uses authorized existing local Linux infrastructure with isolated disposable resources and synthetic media. No production libraries are test inputs.
@@ -86,3 +86,36 @@ R10 performance maps to D2 and D5-D6: benchmark cold application cache, warm res
 Implement in order: portable persistence and migrations; read-only bounded manifest/tasks; internal and Czkawka analysis; matching and quality calibration; barrier and journaled actions; UI/API/settings; Docker and Unraid packaging; performance tuning and full qualification. Each milestone must include meaningful tests and aligned design/dataflow revisions. Enforce PEP 8, PEP 257, formatting, static analysis and typed contracts. Use only isolated authorized local Linux testing; preserve unrelated persistent services.
 Sources and unresolved qualification
 [S1] SQLite Write Ahead Logging: https://www.sqlite.org/wal.html (consulted 25 October 2026). PostgreSQL locking semantics: https://www.postgresql.org/docs/current/sql-select.html. These describe backend mechanisms, not measured OptiKeep performance. Exact dependency versions, SQLite local filesystem validation, perceptual thresholds, video-quality weights and numeric benchmark gates remain implementation qualification items. They must be resolved before enabling automatic quarantine.
+
+# Implementation status and qualification evidence
+
+Revision 1.1 | 25 October 2026 | Development implementation 0.1.0
+
+This revision records the first executable read-only implementation. The full architecture in D1-D13 remains the target; its presence in this specification does not mean every component has been delivered.
+
+Implemented modules: optikeep/db.py defines the portable schema and transaction/lease adapter; coordinator.py owns batched discovery, cache admission and result validation; media.py performs internal whole-file hashing, image hashes and initial measurements, and FFprobe metadata extraction; api.py exposes authenticated management and daemon routes; cli.py runs the coordinator or sequential daemon. process.py bounds subprocess output and runtime. ownership.py prevents simultaneous coordinator ownership; storage.py rejects known network filesystem types for SQLite.
+
+SQLite uses WAL, foreign keys, FULL synchronization and immediate write transactions. PostgreSQL uses row-locked task claims and a session advisory ownership lock. Cache reuse is explicitly opt-in and metadata-trusted; strict scans are the default. Exact candidates use an indexed SHA-256 column and bounded review output with a truncation flag. Candidate truncation does not establish completeness and is never actionable.
+
+The current UI provides scan submission, progress, exact-candidate review and redacted read-only bootstrap settings. It is an initial interface, not the complete Settings or review experience in the target specification. Configuration precedence currently covers environment over defaults; persisted editable Settings and broad CLI overrides remain pending.
+
+Safety state: every run reports barrier_open false and mutation_enabled false. No source-action route or executor exists. The application cannot reach READY. Czkawka 12.0.2 is checksum-pinned in the image and its version command has run on a Linux build worker; detector invocation/parsing and independent evidence coverage are pending. Initial image measurements are explicitly not qualified keeper rankings.
+
+Initial isolated qualification: the first functional suite passed 12 tests on SQLite3 and the same 12 on PostgreSQL. The first CI run failed its subsequent static-check step because Ruff attempted to write in the non-root image directory; functional success is not a full CI pass. The corrected final suite adds ownership, heartbeat expiry, subprocess budgets and exact-candidate tests. Final results must be read from the accompanying validation report.
+
+Requirements implementation matrix
+
+| Requirement | Implementation | Qualification |
+| --- | --- | --- |
+| R01 dual backends | Schema, leases and results implemented | Foundational tests on both; backup/transfer pending |
+| R02 bounded scans | Batched manifest and bounded subprocess output | Large-corpus memory benchmarks pending |
+| R03 cache correctness | Strict default and opt-in metadata reuse | Change and cache fixtures present; broader trust tests pending |
+| R04 independent evidence | Czkawka binary pinned and runnable | Evidence integration pending |
+| R05 decisions | Internal measurements and exact review | Perceptual grouping, calibration and keepers pending |
+| R06 full barrier | Source actions unavailable; barrier closed | Incomplete-run fixtures present |
+| R07 recovery | No filesystem mutation executor | Quarantine, restore and purge pending |
+| R08 API and UX | Token-scoped initial API and UI | Initial auth fixtures; complete UX qualification pending |
+| R09 deployment | Non-root development Docker and Compose | Linux image built; full Unraid packaging pending |
+| R10 performance | Batched discovery and indexed exact candidates | Baselines and regression budgets pending |
+
+No release or production readiness is claimed. Remaining work includes independent Czkawka image/video detectors, internal video fingerprints, indexed perceptual matching, complete quality scoring, group decisions, journaled actions, audit/configuration history, complete settings/UI, autoscaling, metrics, approved branding integration, Unraid packaging, migrations beyond initial schema, backup/restore/backend transfer, distributed qualification and reproducible benchmarks.

@@ -1,7 +1,7 @@
 # Ownership and read only processing
 
 OptiKeep system dataflow and processing specification
-Version 1.0 | 25 October 2026 | Companion to system design version 1.0
+Version 1.1 | 25 October 2026 | Companion to system design version 1.1
 This specification defines ownership, records and completion boundaries for the implementation. PostgreSQL and SQLite3 implement the same logical flows. Revision 1.0 establishes bounded discovery, read-only daemon analysis, independent Czkawka evidence and journaled coordinator-only actions. Flow IDs F1-F6 trace to design sections D1-D13 and requirements R01-R10.
 F1 Discovery and cache admission
 Configured allowed roots -> coordinator traversal -> observed file generation -> run manifest -> batched cache lookup -> bounded task admission. The coordinator reads filesystem metadata and writes manifest records. Exclusions are recorded. Queue pressure stops further admission without declaring traversal complete. Identity uncertainty creates verification work, never a fabricated cache hit. Dependencies: D2, D5; R02, R03.
@@ -42,3 +42,17 @@ Daemon/tool error -> structured task failure -> bounded retry if transient -> un
 First stop signal -> halt admission -> stop or finish safe in-flight tasks -> commit checkpoints -> close connections and flush diagnostics. Restart -> exclusive coordinator ownership -> schema/version verification -> pending-action reconciliation -> task lease reconciliation -> manifest revalidation -> resume read-only work. A forced stop cannot authorize skipping recovery.
 Dataflow acceptance and change control
 For each F1-F6 flow, record input/output schemas, row counts, error paths and before/after state in integration tests on both backends. Inject duplicated, reordered and delayed messages; prove that no premature READY state or duplicate action results. Validate memory/backpressure under large manifests. Keep this source and generated documents versioned alongside the design specification; an API, table, state-machine or authority change requires updates to both and links to release evidence. This document describes a design; no integration or performance test is claimed completed.
+
+# Implemented flow boundaries
+
+Revision 1.1 | 25 October 2026
+
+F1 is implemented as synchronous streamed discovery with bounded manifest commits. Each discovered file creates a durable run membership and PENDING or cache-reused COMMITTED task. Directory and I/O failures produce INCOMPLETE; symlinks are skipped. Multiple selected libraries, final reconciliation and a persisted discovery-resume cursor remain pending.
+
+F2 supports task claims, current-lease heartbeats, SHA-256, image hashes/initial measurements and FFprobe metadata. Analysis checks source identity before/after reads; the coordinator validates lease, algorithm and identity before committing result/cache/task state together. A result acknowledgement follows commit. Identical replay returns its original acknowledgement. The daemon uses a separate token and has no database access.
+
+F3 is pending beyond binary packaging/version verification. F4 currently exposes only bounded non-actionable exact-hash candidate lists. Independent evidence aggregation, complete grouping, confidence and keeper plans remain pending. F5 and F6 are absent: no filesystem action endpoint exists.
+
+Every preview run has a closed mutation barrier regardless of internal task completion. /health reports liveness and read-only mode; /ready returns 503 because required pipeline coverage is incomplete. This deliberate distinction must remain until mandatory detector and action recovery qualification is complete.
+
+The implementation uses environment configuration and bootstrap defaults. Persistent settings, complete metrics/logging, daemon registration, durable discovery resume and staged shutdown reconciliation remain target flows. The validation report records which implemented contracts passed checks, without implying qualification of pending flows.

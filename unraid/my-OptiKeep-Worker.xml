@@ -1,0 +1,20 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Container version="2">
+  <Name>OptiKeep-Worker</Name>
+  <Repository>optikeep:development</Repository>
+  <Registry />
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/jfroebe/OptiKeep/issues</Support>
+  <Project>https://github.com/jfroebe/OptiKeep</Project>
+  <Overview>Read-only analysis worker. Install a coordinator separately; use the same daemon token and media mapping.</Overview>
+  <Category>Tools:</Category>
+  <WebUI />
+  <Icon />
+  <ExtraParams>--user=99:100 --read-only --tmpfs=/tmp:rw,noexec,nosuid,size=128m --cap-drop=ALL --security-opt=no-new-privileges:true --restart=unless-stopped --no-healthcheck</ExtraParams>
+  <PostArgs>daemon --url http://COORDINATOR_HOST:18766</PostArgs>
+  <Description>Read-only OptiKeep development preview for Linux amd64.</Description>
+  <Config Name="Daemon token" Target="OPTIKEEP_DAEMON_TOKEN" Default="" Mode="" Description="Same token on coordinator and workers; at least 24 characters." Type="Variable" Display="always" Required="true" Mask="true" />
+  <Config Name="Media" Target="/media" Default="" Mode="ro" Description="Select the same media directory for coordinator and workers; read-only." Type="Path" Display="always" Required="true" Mask="false" />
+  <Config Name="Timezone" Target="TZ" Default="Etc/UTC" Mode="" Description="IANA timezone." Type="Variable" Display="always" Required="true" Mask="false">Etc/UTC</Config>
+</Container>

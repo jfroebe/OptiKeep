@@ -75,11 +75,25 @@ logs and coordinator task/lease status. The worker restarts unless stopped.
 No logo/icon URL is supplied until the approved artwork is checked into a
 reachable repository location; the templates must not reference nonexistent art.
 
-## Qualification still required
+## Qualification
 
-Run SQLite and disposable PostgreSQL qualification on the existing authorized
-Linux test workers, including fresh bind-mounted appdata under UID 99:GID 100,
-a deliberately unwritable appdata directory, coordinator health, and a worker
-claiming and completing synthetic-media tasks. Do not use production media.
-The current environment has no Docker executable; these packaging changes do
-not constitute a new successful image build or Unraid runtime qualification.
+The image was built on the existing authorized Linux Meta build worker and
+validated on the Meta controller. SQLite3 and disposable PostgreSQL 18 each
+passed all 16 functional/safety tests. Ruff and Black passed. Fresh bind-mounted
+appdata, UID 99:GID 100, a read-only root filesystem, zero effective capabilities,
+health and restart behavior passed for both backends.
+
+Build evidence and the loadable image/template bundle:
+https://github.com/jfroebe/chatgpt-dev-control/actions/runs/40243350162
+
+Download and extract the workflow artifact, verify SHA256SUMS, then load the image:
+
+```console
+sha256sum -c SHA256SUMS
+docker load -i optikeep-development.tar.gz
+```
+
+Testing defaults to the existing Meta environment unless explicitly directed
+otherwise. Production media and the Unraid host were not accessed. Actual Unraid
+UI installation, deliberately unwritable appdata diagnostics and a full packaged
+worker scan remain outside this qualification. This is a development preview.

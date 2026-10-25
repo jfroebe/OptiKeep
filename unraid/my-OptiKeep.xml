@@ -1,0 +1,24 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Container version="2">
+  <Name>OptiKeep</Name>
+  <Repository>optikeep:development</Repository>
+  <Registry />
+  <Network>bridge</Network>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/jfroebe/OptiKeep/issues</Support>
+  <Project>https://github.com/jfroebe/OptiKeep</Project>
+  <Overview>OptiKeep read-only development preview. SQLite3 or PostgreSQL. Install an analysis worker separately. No quarantine or deletion in this preview.</Overview>
+  <Category>Tools:</Category>
+  <WebUI>http://[IP]:[PORT:18766]/</WebUI>
+  <Icon />
+  <ExtraParams>--user=99:100 --read-only --tmpfs=/tmp:rw,noexec,nosuid,size=128m --cap-drop=ALL --security-opt=no-new-privileges:true --restart=unless-stopped</ExtraParams>
+  <PostArgs>serve</PostArgs>
+  <Description>Read-only OptiKeep development preview for Linux amd64.</Description>
+  <Config Name="WebUI port" Target="18766" Default="18766" Mode="tcp" Description="Coordinator HTTP port; trusted LAN only." Type="Port" Display="always" Required="true" Mask="false">18766</Config>
+  <Config Name="Appdata" Target="/config" Default="/mnt/user/appdata/optikeep" Mode="rw" Description="Pre-create writable by UID 99:GID 100. Stores SQLite and coordinator lock." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/optikeep</Config>
+  <Config Name="Database URL" Target="OPTIKEEP_DATABASE_URL" Default="sqlite:////config/optikeep.sqlite3" Mode="" Description="sqlite:/// or postgresql+psycopg:// DSN." Type="Variable" Display="always" Required="true" Mask="true">sqlite:////config/optikeep.sqlite3</Config>
+  <Config Name="Administrator token" Target="OPTIKEEP_API_TOKEN" Default="" Mode="" Description="Separate random token; at least 24 characters." Type="Variable" Display="always" Required="true" Mask="true" />
+  <Config Name="Daemon token" Target="OPTIKEEP_DAEMON_TOKEN" Default="" Mode="" Description="Same token on coordinator and workers; at least 24 characters." Type="Variable" Display="always" Required="true" Mask="true" />
+  <Config Name="Media" Target="/media" Default="" Mode="ro" Description="Select the same media directory for coordinator and workers; read-only." Type="Path" Display="always" Required="true" Mask="false" />
+  <Config Name="Timezone" Target="TZ" Default="Etc/UTC" Mode="" Description="IANA timezone." Type="Variable" Display="always" Required="true" Mask="false">Etc/UTC</Config>
+</Container>

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "optikeep"
+version = "0.1.0"
+description = "Read-only distributed media analysis and evidence management"
+requires-python = ">=3.12"
+license = "GPL-3.0-only"
+dependencies = ["fastapi==0.115.12", "uvicorn==0.34.2", "SQLAlchemy==2.0.40", "psycopg[binary]==3.2.6", "Pillow==11.2.1", "ImageHash==4.3.2", "numpy==2.2.5", "httpx==0.28.1"]
+
+[project.optional-dependencies]
+test = ["pytest==8.3.5", "ruff==0.11.8", "black==25.1.0"]
+
+[project.scripts]
+optikeep = "optikeep.cli:main"
+
+[tool.setuptools.package-data]
+optikeep = ["static/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "D"]
+ignore = ["E501"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

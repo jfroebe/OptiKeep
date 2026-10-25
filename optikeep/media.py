@@ -2,12 +2,13 @@
 
 import hashlib
 import json
-import subprocess
 from pathlib import Path
 
 import imagehash
 import numpy as np
 from PIL import Image, ImageOps
+
+from optikeep.process import run_tool
 
 ALGORITHM = "internal-v1"
 IMAGES = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".bmp"}
@@ -109,7 +110,7 @@ def analyze(root: Path, task: dict, pixel_limit: int, timeout: int) -> dict:
                 "ranking_qualified": False,
             }
     else:
-        process = subprocess.run(
+        output = run_tool(
             [
                 "ffprobe",
                 "-v",
@@ -120,13 +121,9 @@ def analyze(root: Path, task: dict, pixel_limit: int, timeout: int) -> dict:
                 "json",
                 str(path),
             ],
-            capture_output=True,
             timeout=timeout,
-            check=True,
         )
-        if len(process.stdout) > 4_000_000:
-            raise ValueError("Video metadata exceeds result budget")
-        result["video"] = json.loads(process.stdout)
+        result["video"] = json.loads(output)
     if identity(path) != before:
         raise ValueError("Source changed during analysis")
     return result

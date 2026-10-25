@@ -170,3 +170,55 @@ def test_changed_cache_invalidates(environment):
     assert coordinator.status(run)["tasks"] == {"PENDING": 1}
     with db.engine.connect() as conn:
         assert conn.execute(select(records.c.key)).first() is not None
+
+
+def test_heartbeat_does_not_revive_expired_task(environment):
+    """Reject heartbeats after a lease has expired."""
+    settings, db, coordinator = environment
+    make_image(settings.media_root)
+    coordinator.discover()
+    task = db.claim(90)
+    db.heartbeat(task["id"], task["lease"], 120)
+    with db.write() as conn:
+        conn.execute(update(tasks).where(tasks.c.id == task["id"]).values(expiry=0))
+    with pytest.raises(ValueError, match="Stale"):
+        db.heartbeat(task["id"], task["lease"], 120)
+
+
+def test_subprocess_output_and_timeout():
+    """Stop noisy and stalled tools while reliably reaping child processes."""
+    import sys
+
+    from optikeep.process import run_tool
+
+    with pytest.raises(ValueError, match="output budget"):
+        run_tool([sys.executable, "-c", "print('x' * 100000)"], 5, 1024)
+    with pytest.raises(TimeoutError):
+        run_tool([sys.executable, "-c", "import time; time.sleep(10)"], 1)
+
+
+def test_single_coordinator(environment):
+    """A second coordinator cannot acquire the same authoritative state."""
+    from optikeep.ownership import coordinator_lock
+
+    settings, db, _ = environment
+    with coordinator_lock(db, settings.state_root):
+        with pytest.raises(RuntimeError, match="Another coordinator"):
+            with coordinator_lock(db, settings.state_root):
+                pytest.fail("Concurrent coordinator entered")
+
+
+def test_exact_candidates(environment):
+    """Index exact duplicates while keeping review output non-actionable."""
+    settings, db, coordinator = environment
+    make_image(settings.media_root, "a.png")
+    make_image(settings.media_root, "b.png")
+    run_id = coordinator.discover()
+    for _ in range(2):
+        task = db.claim(90)
+        coordinator.submit(
+            task["id"], task["lease"], analyze(settings.media_root, task, 10000, 10)
+        )
+    candidates = coordinator.exact_candidates(run_id)
+    assert list(candidates["groups"].values()) == [["a.png", "b.png"]]
+    assert candidates["actionable"] is False

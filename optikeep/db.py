@@ -23,6 +23,8 @@ from sqlalchemy import (
     update,
 )
 
+from optikeep.storage import validate_sqlite_path
+
 metadata = MetaData()
 schema = Table(
     "schema_versions", metadata, Column("version", Integer, primary_key=True)
@@ -52,6 +54,7 @@ records = Table(
     metadata,
     Column("key", String, primary_key=True),
     Column("result", Text, nullable=False),
+    Column("sha256", String(64), nullable=False, index=True),
 )
 tasks = Table(
     "tasks",
@@ -98,6 +101,7 @@ class Database:
         )
         self.engine = create_engine(url, **options)
         if self.engine.dialect.name == "sqlite":
+            validate_sqlite_path(self.engine.url.database)
             event.listen(self.engine, "connect", self._sqlite)
 
     @staticmethod
@@ -142,6 +146,23 @@ class Database:
                     select(runs).order_by(runs.c.created.desc()).limit(100)
                 ).mappings()
             ]
+
+    def heartbeat(self, task_id: str, lease: str, seconds: int):
+        """Extend only an unexpired current lease without reviving old work."""
+        now = int(time.time())
+        with self.write() as conn:
+            changed = conn.execute(
+                update(tasks)
+                .where(
+                    tasks.c.id == task_id,
+                    tasks.c.lease == lease,
+                    tasks.c.state == "LEASED",
+                    tasks.c.expiry >= now,
+                )
+                .values(expiry=now + seconds)
+            )
+            if changed.rowcount != 1:
+                raise ValueError("Stale task lease")
 
     def claim(self, seconds: int) -> dict | None:
         """Lease one pending or expired task, atomically across claimants."""

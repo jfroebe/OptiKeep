@@ -165,11 +165,13 @@ class Coordinator:
                 conn.execute(
                     update(records)
                     .where(records.c.key == existing)
-                    .values(result=serialized)
+                    .values(result=serialized, sha256=value)
                 )
             else:
                 conn.execute(
-                    insert(records).values(key=row["cache_key"], result=serialized)
+                    insert(records).values(
+                        key=row["cache_key"], result=serialized, sha256=value
+                    )
                 )
             conn.execute(
                 update(tasks)
@@ -217,3 +219,47 @@ class Coordinator:
             ],
         )
         return run
+
+    def exact_candidates(self, run_id: str) -> dict:
+        """Return bounded exact-hash candidates without ranking or deletion claims."""
+        joined = files.join(tasks, tasks.c.file_id == files.c.id).join(
+            records, files.c.cache_key == records.c.key
+        )
+        with self.db.engine.connect() as conn:
+            hashes = list(
+                conn.execute(
+                    select(records.c.sha256)
+                    .select_from(joined)
+                    .where(
+                        files.c.run_id == run_id,
+                        tasks.c.state == "COMMITTED",
+                    )
+                    .group_by(records.c.sha256)
+                    .having(func.count() > 1)
+                    .order_by(records.c.sha256)
+                    .limit(101)
+                ).scalars()
+            )
+            rows = (
+                conn.execute(
+                    select(files.c.path, records.c.sha256)
+                    .select_from(joined)
+                    .where(
+                        files.c.run_id == run_id,
+                        tasks.c.state == "COMMITTED",
+                        records.c.sha256.in_(hashes[:100]),
+                    )
+                    .order_by(records.c.sha256, files.c.path)
+                    .limit(1025)
+                )
+                .mappings()
+                .all()
+            )
+        groups = {}
+        for row in rows[:1024]:
+            groups.setdefault(row["sha256"], []).append(row["path"])
+        return {
+            "groups": groups,
+            "truncated": len(hashes) > 100 or len(rows) > 1024,
+            "actionable": False,
+        }

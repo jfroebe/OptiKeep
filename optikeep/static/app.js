@@ -11,7 +11,7 @@ async function request(path, method = 'GET', body) {
     for (const entry of entries) {
       const card = document.createElement('article'); card.className = 'card';
       const pre = document.createElement('pre'); pre.textContent = JSON.stringify(entry, null, 2); card.append(pre);
-      if (entry.id) { const button = document.createElement('button'); button.textContent = 'View analysis progress'; button.onclick = () => request('runs/' + entry.id); card.append(button); }
+      if (entry.id) { const button = document.createElement('button'); button.textContent = 'View analysis progress'; button.onclick = () => request('runs/' + entry.id); card.append(button); const duplicates = document.createElement('button'); duplicates.textContent = 'Review exact candidates'; duplicates.onclick = () => request('runs/' + entry.id + '/exact-candidates'); card.append(duplicates); }
       byId('results').append(card);
     }
     byId('status').textContent = entries.length ? 'Updated' : 'No scans yet';

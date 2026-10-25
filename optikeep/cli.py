@@ -2,13 +2,45 @@
 
 import argparse
 import os
+import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 import httpx
 import uvicorn
 
 from optikeep.media import analyze
+
+
+@contextmanager
+def renew_lease(client, task):
+    """Keep long-running hashes alive and stop renewal before result submission."""
+    stopped = threading.Event()
+    failures = []
+
+    def heartbeat():
+        """Renew at a bounded interval until analysis has finished."""
+        while not stopped.wait(15):
+            try:
+                response = client.post(
+                    f"/api/v1/tasks/{task['id']}/heartbeat",
+                    json={"lease": task["lease"]},
+                )
+                response.raise_for_status()
+            except Exception as error:
+                failures.append(error)
+                return
+
+    worker = threading.Thread(target=heartbeat, daemon=True)
+    worker.start()
+    try:
+        yield
+        if failures:
+            raise RuntimeError("Analysis lease renewal failed")
+    finally:
+        stopped.set()
+        worker.join(timeout=65)
 
 
 def main():
@@ -39,7 +71,8 @@ def main():
                 time.sleep(2)
                 continue
             try:
-                result = analyze(args.media_root, task, 40_000_000, 60)
+                with renew_lease(client, task):
+                    result = analyze(args.media_root, task, 40_000_000, 60)
             except Exception as error:
                 response = client.post(
                     f"/api/v1/tasks/{task['id']}/failure",

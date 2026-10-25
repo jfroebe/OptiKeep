@@ -13,6 +13,7 @@ from sqlalchemy.exc import NoResultFound
 from optikeep.config import Settings
 from optikeep.coordinator import Coordinator
 from optikeep.db import Database
+from optikeep.ownership import coordinator_lock
 
 
 class Submission(BaseModel):
@@ -35,6 +36,12 @@ class ScanRequest(BaseModel):
     trust_metadata_cache: bool = False
 
 
+class Heartbeat(BaseModel):
+    """Bind lease extension to the task currently owned by the daemon."""
+
+    lease: str = Field(max_length=64)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     """Build the coordinator service without opening connections at import."""
     settings = settings or Settings.from_env()
@@ -45,9 +52,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(_app):
         """Initialize persistent schema and close the engine on shutdown."""
         settings.state_root.mkdir(parents=True, exist_ok=True)
-        db.migrate()
-        yield
-        db.engine.dispose()
+        with coordinator_lock(db, settings.state_root):
+            db.migrate()
+            try:
+                yield
+            finally:
+                db.engine.dispose()
 
     app = FastAPI(title="OptiKeep", version="0.1.0", lifespan=lifespan)
     app.state.coordinator = coordinator
@@ -121,6 +131,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """Show progress and unsatisfied safety requirements."""
         return coordinator.status(run_id)
 
+    @app.get("/api/v1/runs/{run_id}/exact-candidates", dependencies=[Depends(user)])
+    def exact_candidates(run_id: str):
+        """List indexed whole-file hash candidates for read-only review."""
+        return coordinator.exact_candidates(run_id)
+
     @app.post("/api/v1/tasks/claim", dependencies=[Depends(daemon)])
     def claim():
         """Lease one task for a read-only daemon."""
@@ -130,6 +145,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def submit(task_id: str, body: Submission):
         """Persist a validated result and return an idempotent acknowledgement."""
         coordinator.submit(task_id, body.lease, body.result)
+        return {"accepted": True}
+
+    @app.post("/api/v1/tasks/{task_id}/heartbeat", dependencies=[Depends(daemon)])
+    def heartbeat(task_id: str, body: Heartbeat):
+        """Renew a current task lease while expensive analysis runs."""
+        db.heartbeat(task_id, body.lease, settings.lease_seconds)
         return {"accepted": True}
 
     @app.post("/api/v1/tasks/{task_id}/failure", dependencies=[Depends(daemon)])

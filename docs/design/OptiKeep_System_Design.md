@@ -1,7 +1,7 @@
 # Purpose and document control
 
 OptiKeep system design and requirements specification
-Version 1.1 | 25 October 2026 | Prepared for Jason Froebe
+Version 1.2 | 26 October 2026 | Prepared for Jason Froebe
 Status: implementation baseline proposal. This document defines intended behavior, not a claim of implemented or tested functionality. PostgreSQL and SQLite3 are mandatory supported alternatives. Both provide identical evidence, safety and recovery semantics; backend selection changes database operations and capacity, not detector coverage.
 OptiKeep is a Linux and Unraid appliance for distributed photo and video duplicate analysis, quality ranking, explainable keeper selection and reversible quarantine. A single authoritative coordinator owns discovery, persistence, scheduling and all source modifications. Analysis daemons have read-only source mounts and no database credentials.
 Scope includes mandatory Czkawka alongside internal detection, FFmpeg and FFprobe, persistent caches, multiple daemons, a web interface, REST API, metrics, Docker packaging and an Unraid template. Windows and macOS qualification are excluded. Testing uses authorized existing local Linux infrastructure with isolated disposable resources and synthetic media. No production libraries are test inputs.
@@ -119,3 +119,20 @@ Requirements implementation matrix
 | R10 performance | Batched discovery and indexed exact candidates | Baselines and regression budgets pending |
 
 No release or production readiness is claimed. Remaining work includes independent Czkawka image/video detectors, internal video fingerprints, indexed perceptual matching, complete quality scoring, group decisions, journaled actions, audit/configuration history, complete settings/UI, autoscaling, metrics, approved branding integration, Unraid packaging, migrations beyond initial schema, backup/restore/backend transfer, distributed qualification and reproducible benchmarks.
+
+# Revision 1.2 PostgreSQL template configuration
+
+Revision 1.2 PostgreSQL template configuration
+Version control entry 26 October 2026. This revision changes the Unraid configuration contract without changing the database schema, daemon API, source media access or read-only safety barrier.
+
+D12 Database connection fields
+The coordinator template selects sqlite3 or postgresql through OPTIKEEP_DATABASE_BACKEND. SQLite uses OPTIKEEP_SQLITE_PATH, an absolute local file path defaulting to /config/optikeep.sqlite3. PostgreSQL uses OPTIKEEP_POSTGRES_HOST, OPTIKEEP_POSTGRES_PORT, OPTIKEEP_POSTGRES_DATABASE, OPTIKEEP_POSTGRES_USERNAME and OPTIKEEP_POSTGRES_PASSWORD. The default port is 5432; accepted ports are 1 through 65535. All remaining PostgreSQL fields are required when that backend is selected.
+
+Credential handling and precedence
+Users enter PostgreSQL passwords literally. SQLAlchemy constructs and escapes the connection URL, including reserved characters. The Unraid password field is intentionally unmasked at the owner request; API settings responses remain redacted. Workers receive no database credentials. Explicit backend selection takes precedence over OPTIKEEP_DATABASE_URL. The legacy URL is retained only when no backend is explicitly selected. Invalid backends, incomplete PostgreSQL fields and relative SQLite paths fail instead of selecting another backend.
+
+Token guidance
+Coordinator administrator and daemon token descriptions include openssl rand -hex 32. Generate distinct administrator and daemon tokens; use the same daemon token on the coordinator and its workers.
+
+Requirements traceability
+R01 and R09 map to optikeep/config.py, the coordinator and worker XML templates, and tests/test_core.py. Verification covers literal password and username round trips, port bounds, missing fields, redaction, backend precedence, absolute SQLite paths and unsupported backend rejection. Both backends must pass on the existing Meta Linux environment before the updated image bundle is distributed.

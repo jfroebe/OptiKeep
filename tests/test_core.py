@@ -222,3 +222,52 @@ def test_exact_candidates(environment):
     candidates = coordinator.exact_candidates(run_id)
     assert list(candidates["groups"].values()) == [["a.png", "b.png"]]
     assert candidates["actionable"] is False
+
+
+def test_postgres_fields_from_environment(monkeypatch):
+    """Preserve literal credentials and redact the constructed connection URL."""
+    from sqlalchemy.engine import make_url
+
+    for key, value in {
+        "OPTIKEEP_API_TOKEN": "administrator-token-for-testing",
+        "OPTIKEEP_DAEMON_TOKEN": "worker-token-for-testing-only",
+        "OPTIKEEP_DATABASE_BACKEND": "postgresql",
+        "OPTIKEEP_POSTGRES_HOST": "database.example.internal",
+        "OPTIKEEP_POSTGRES_PORT": "5544",
+        "OPTIKEEP_POSTGRES_DATABASE": "photo library",
+        "OPTIKEEP_POSTGRES_USERNAME": "photo@user",
+        "OPTIKEEP_POSTGRES_PASSWORD": "a:@/+#% password",
+        "OPTIKEEP_DATABASE_URL": "sqlite:////ignored.sqlite3",
+    }.items():
+        monkeypatch.setenv(key, value)
+    settings = Settings.from_env()
+    url = make_url(settings.database_url)
+    assert url.password == "a:@/+#% password"
+    assert url.username == "photo@user"
+    assert url.database == "photo library"
+    assert url.host == "database.example.internal"
+    assert url.port == 5544
+    assert settings.public()["database_url"] == "postgresql+psycopg"
+    monkeypatch.setenv("OPTIKEEP_POSTGRES_PORT", "65536")
+    with pytest.raises(ValueError, match="PORT"):
+        Settings.from_env()
+    monkeypatch.setenv("OPTIKEEP_POSTGRES_PORT", "5432")
+    monkeypatch.delenv("OPTIKEEP_POSTGRES_PASSWORD")
+    with pytest.raises(ValueError, match="PASSWORD"):
+        Settings.from_env()
+
+
+def test_explicit_sqlite_environment(monkeypatch):
+    """Keep SQLite independent of PostgreSQL fields and validate its path."""
+    monkeypatch.setenv("OPTIKEEP_API_TOKEN", "administrator-token-for-testing")
+    monkeypatch.setenv("OPTIKEEP_DAEMON_TOKEN", "worker-token-for-testing-only")
+    monkeypatch.setenv("OPTIKEEP_DATABASE_BACKEND", "sqlite3")
+    monkeypatch.setenv("OPTIKEEP_SQLITE_PATH", "/config/example.sqlite3")
+    monkeypatch.setenv("OPTIKEEP_POSTGRES_PASSWORD", "ignored")
+    assert Settings.from_env().database_url == "sqlite:////config/example.sqlite3"
+    monkeypatch.setenv("OPTIKEEP_SQLITE_PATH", "relative.sqlite3")
+    with pytest.raises(ValueError, match="absolute"):
+        Settings.from_env()
+    monkeypatch.setenv("OPTIKEEP_DATABASE_BACKEND", "other")
+    with pytest.raises(ValueError, match="BACKEND"):
+        Settings.from_env()

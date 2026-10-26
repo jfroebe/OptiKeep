@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.engine import URL
 
 
 class Settings(BaseModel):
@@ -30,13 +31,40 @@ class Settings(BaseModel):
     @classmethod
     def from_env(cls) -> "Settings":
         """Load explicit environment overrides without logging secrets."""
-        return cls(
-            **{
-                key: os.environ[f"OPTIKEEP_{key.upper()}"]
-                for key in cls.model_fields
-                if f"OPTIKEEP_{key.upper()}" in os.environ
-            }
-        )
+        values = {
+            key: os.environ[f"OPTIKEEP_{key.upper()}"]
+            for key in cls.model_fields
+            if f"OPTIKEEP_{key.upper()}" in os.environ
+        }
+        backend = os.environ.get("OPTIKEEP_DATABASE_BACKEND", "").strip()
+        if backend == "postgresql":
+            fields = {}
+            for name in ("host", "database", "username", "password"):
+                key = f"OPTIKEEP_POSTGRES_{name.upper()}"
+                if not os.environ.get(key):
+                    raise ValueError(f"{key} is required for PostgreSQL")
+                fields[name] = os.environ[key]
+            try:
+                port = int(os.environ.get("OPTIKEEP_POSTGRES_PORT", "5432"))
+                if not 1 <= port <= 65535:
+                    raise ValueError
+            except ValueError:
+                raise ValueError(
+                    "OPTIKEEP_POSTGRES_PORT must be 1 through 65535"
+                ) from None
+            values["database_url"] = URL.create(
+                "postgresql+psycopg", port=port, **fields
+            ).render_as_string(hide_password=False)
+        elif backend == "sqlite3":
+            path = os.environ.get("OPTIKEEP_SQLITE_PATH", "/config/optikeep.sqlite3")
+            if not Path(path).is_absolute():
+                raise ValueError("OPTIKEEP_SQLITE_PATH must be an absolute path")
+            values["database_url"] = URL.create(
+                "sqlite", database=path
+            ).render_as_string(hide_password=False)
+        elif backend:
+            raise ValueError("OPTIKEEP_DATABASE_BACKEND must be sqlite3 or postgresql")
+        return cls(**values)
 
     def public(self) -> dict:
         """Return bootstrap settings with credentials and DSNs redacted."""

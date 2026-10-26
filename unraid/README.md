@@ -67,17 +67,19 @@ Set the worker coordinator URL to the coordinator's reachable address and port
 18766. Use a trusted local network; remote access requires a TLS reverse proxy.
 Open the coordinator WebUI at port 18766 and use the administrator token.
 
-SQLite3 is the default, persisted at `/config/optikeep.sqlite3`. Keep appdata on
-local storage with reliable locking, outside scanned media. For PostgreSQL,
-replace the database URL with:
+SQLite3 is the default. Choose the database backend in the template. SQLite
+uses the absolute SQLite file path, defaulting to `/config/optikeep.sqlite3`.
+Keep appdata on local storage with reliable locking, outside scanned media.
+For PostgreSQL, fill in host, port (5432 by default), database, username and
+password. Enter the password literally; URL encoding is handled by OptiKeep.
+The password is displayed as plain text in the template as requested. Application
+settings responses continue to redact connection credentials.
 
-```text
-postgresql+psycopg://optikeep:URL_ENCODED_PASSWORD@database.example.internal:5432/optikeep
-```
-
-Create a dedicated database and user first. PostgreSQL is external to this image.
-Do not add database credentials to the worker. Only one coordinator may own a
-given database. Stop the coordinator before copying SQLite appdata for backup.
+Create a dedicated PostgreSQL database and user first. PostgreSQL is external to
+this image. Workers receive only their daemon token, never database credentials.
+Only one coordinator may own a database. Stop the coordinator before copying
+SQLite appdata for backup. Explicit backend selection overrides the legacy
+OPTIKEEP_DATABASE_URL; the legacy URL remains supported when no backend is set.
 
 The image healthcheck applies to the coordinator. The worker template disables
 that HTTP healthcheck because workers expose no HTTP server. Monitor worker

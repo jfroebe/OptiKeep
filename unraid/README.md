@@ -30,8 +30,19 @@ registry tag in both templates if publishing separately.
 
 ## Install
 
-Copy both XML files into `/boot/config/plugins/dockerMan/templates-user/`.
-In Docker → Add Container, select `OptiKeep` and then `OptiKeep-Worker`.
+Extract the ZIP and run the installer as root from an Unraid terminal:
+
+```console
+bash /path/to/extracted/optikeep/install-template.sh
+```
+
+The installer verifies the complete bundle against `SHA256SUMS`, installs both
+XML templates in `/boot/config/plugins/dockerMan/templates-user/`, and backs up
+any different existing templates before replacing them. It can be run from any
+working directory. Repeating installation of identical templates makes no changes.
+It does not load the Docker image, create containers, or modify appdata/media.
+
+Then in Docker → Add Container, select `OptiKeep` and `OptiKeep-Worker`.
 
 Prepare the coordinator appdata directory before starting it. The default
 runtime identity is UID 99, GID 100, configured through `--user=99:100`:
